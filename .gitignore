@@ -1,0 +1,29 @@
+# Unity-related files
+unity/[Ll]ibrary/
+unity/[Tt]emp/
+unity/[Oo]bj/
+unity/[Bb]uild/
+unity/[Bb]uilds/
+unity/[Ll]ogs/
+unity/[Mm]emoryCaptures/
+unity/**/*.csproj
+unity/**/*.sln
+unity/**/*.unityproj
+unity/**/*.userprefs
+
+# Flutter-related files
+flutter/.dart_tool/
+flutter/.flutter-plugins
+flutter/.flutter-plugins-dependencies
+flutter/.packages
+flutter/build/
+flutter/ios/Flutter/App.framework
+flutter/android/.gradle
+flutter/android/app/debug/
+flutter/android/app/profile/
+flutter/android/app/release/
+flutter/linux/flutter/ephemeral/
+
+# Common files
+**/*.DS_Store
+**/*.log
