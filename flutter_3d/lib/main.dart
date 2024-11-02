@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'admin_page.dart';
 import 'user_page.dart';
-
 void main() {
   runApp(MyApp());
 }
@@ -42,7 +41,6 @@ class HomePage extends StatelessWidget {
             ElevatedButton(
               child: Text("User Section"),
               onPressed: () {
-                // Redirect to user section (to be implemented for Android)
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => UserPage()),

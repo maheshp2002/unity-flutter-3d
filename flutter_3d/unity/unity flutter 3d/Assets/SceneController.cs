@@ -8,6 +8,7 @@ using Dummiesman;
 
 public class SceneController : MonoBehaviour
 {
+    [SerializeField] private Material defaultMaterial; 
     public GameObject startPrefab;
     public GameObject destinationPrefab;
     public GameObject navigationPrefab;
@@ -177,29 +178,94 @@ public class SceneController : MonoBehaviour
         if (Input.GetKey(KeyCode.LeftShift)) mainCamera.transform.Translate(Vector3.down * Time.deltaTime);
     }
 
-    // Function to import 3D object from Flutter
-    public void Import3DObject(string base64Model)
+    // Update the LoadModelFromUrl to handle base64 string
+    public void LoadModelFromBase64(string base64String)
     {
-        // Convert the base64 string to byte array
-        byte[] modelData = System.Convert.FromBase64String(base64Model);
+        #if UNITY_WEBGL
+        StartCoroutine(DownloadAndLoadModelFromBase64(base64String));
+        #endif
+    }
 
-        // Save the data to a temporary .obj file
-        string tempPath = System.IO.Path.Combine(Application.persistentDataPath, "tempModel.obj");
-        System.IO.File.WriteAllBytes(tempPath, modelData);
+    private IEnumerator DownloadAndLoadModelFromBase64(string base64String)
+    {
+        byte[] modelData = Convert.FromBase64String(base64String);
 
-        // Load the .obj file using OBJLoader
-        GameObject importedModel = objLoader.Load(tempPath); // Correct usage of Load method
-
-        // Check if the model was loaded correctly
-        if (importedModel != null)
+        using (MemoryStream stream = new MemoryStream(modelData))
         {
-            importedModel.transform.position = Vector3.zero;  // Set the initial position
-            importedModel.AddComponent<BoxCollider>();        // Add collider for interaction if needed
-            spawnedObjects.Add(importedModel);                // Add the object to your spawned objects list
+            GameObject importedModel = objLoader.Load(stream);
+
+            if (importedModel != null)
+            {
+                AssignDefaultShader(importedModel);
+                importedModel.transform.position = Vector3.zero;
+                importedModel.AddComponent<BoxCollider>();
+                spawnedObjects.Add(importedModel);
+            }
+            else
+            {
+                Debug.LogError("Failed to load the 3D model.");
+            }
         }
-        else
+        yield return null;
+    }
+
+
+
+    // Function to import 3D object from Flutter
+    // public void Import3DObject(string base64Model)
+    // {
+    //     byte[] modelData = Convert.FromBase64String(base64Model);
+
+    //     #if UNITY_WEBGL
+    //     // Use WebGL-friendly approach to load model (e.g., send model to JS for processing)
+    //     Debug.Log("Model import not directly supported in WebGL. Use JavaScript bridge if needed.");
+    //     #else
+    //     // Save the data to a temporary .obj file
+    //     string tempPath = System.IO.Path.Combine(Application.persistentDataPath, "tempModel.obj");
+    //     System.IO.File.WriteAllBytes(tempPath, modelData);
+
+    //     // Load the .obj file using OBJLoader
+    //     GameObject importedModel = objLoader.Load(tempPath); 
+
+    //     if (importedModel != null)
+    //     {
+    //         AssignDefaultShader(importedModel);
+    //         importedModel.transform.position = Vector3.zero;
+    //         importedModel.AddComponent<BoxCollider>();
+    //         spawnedObjects.Add(importedModel);
+    //     }
+    //     else
+    //     {
+    //         Debug.LogError("Failed to load the 3D model.");
+    //     }
+    //     #endif
+    // }
+
+    // Assigns a default white color shader to the imported model if it lacks one
+    private void AssignDefaultShader(GameObject obj)
+    {
+        // Ensure default material is set
+        if (defaultMaterial == null)
         {
-            Debug.LogError("Failed to load the 3D model.");
+            // Attempt to load the Standard shader if defaultMaterial is missing
+            Shader standardShader = Shader.Find("Standard");
+            if (standardShader != null)
+            {
+                defaultMaterial = new Material(standardShader);
+            }
+            else
+            {
+                Debug.LogError("Standard shader not found. Please assign a default material.");
+                return;
+            }
+        }
+
+        foreach (var renderer in obj.GetComponentsInChildren<Renderer>())
+        {
+            if (renderer.material == null)
+            {
+                renderer.material = defaultMaterial;
+            }
         }
     }
 
@@ -243,7 +309,6 @@ public class SceneController : MonoBehaviour
 
     public void ExportScene(string path)
     {
-        // Prepare the JSON data
         SceneData sceneData = new SceneData();
         foreach (GameObject obj in spawnedObjects)
         {
@@ -259,13 +324,16 @@ public class SceneController : MonoBehaviour
 
         string json = JsonUtility.ToJson(sceneData);
 
-        // Use JavaScript to trigger a file download in WebGL
+    #if UNITY_WEBGL
         string fileName = "sceneData.json";
         Application.ExternalEval($"var blob = new Blob([JSON.stringify({json})], {{ type: 'application/json' }}); " +
                                  $"var link = document.createElement('a'); " +
                                  $"link.href = URL.createObjectURL(blob); " +
                                  $"link.download = '{fileName}'; " +
                                  $"link.click();");
+    #else
+        System.IO.File.WriteAllText(path, json);
+    #endif
     }
 
     [System.Serializable]

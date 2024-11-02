@@ -138,7 +138,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &82643021
 Transform:
   m_ObjectHideFlags: 0
@@ -396,6 +396,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 798057e2deaf65e43bb87bcf4e2a430d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  defaultMaterial: {fileID: 2100000, guid: d72fa7eb3879f4941b0571f01f6182ba, type: 2}
   startPrefab: {fileID: 720988653777492618, guid: 107f982fd00526840a16067a479b5d3c, type: 3}
   destinationPrefab: {fileID: 4044515222399692613, guid: 66c13dabc703ecc4e97559af47b15b23, type: 3}
   navigationPrefab: {fileID: 4043597632298659368, guid: 01647ba5005fa3a4092bae4cd7547553, type: 3}

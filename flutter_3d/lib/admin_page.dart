@@ -11,6 +11,7 @@ class AdminPage extends StatefulWidget {
 
 class _AdminPageState extends State<AdminPage> {
   late UnityWidgetController _unityController;
+  bool _isUnityReady = false;
   bool _isHelpVisible = false;
 
   final List<String> controls = [
@@ -32,7 +33,7 @@ class _AdminPageState extends State<AdminPage> {
     'Back: Back View',
     'L: Left View',
     'R: Right View',
-    'Delete: Delete Selected Object', // New control for deletion
+    'Delete: Delete Selected Object',
   ];
 
   @override
@@ -49,7 +50,6 @@ class _AdminPageState extends State<AdminPage> {
               onUnityMessage: onUnityMessage,
             ),
           ),
-          // Help Panel
           AnimatedContainer(
             duration: Duration(milliseconds: 300),
             width: _isHelpVisible ? 300 : 50,
@@ -121,6 +121,7 @@ class _AdminPageState extends State<AdminPage> {
 
   void onUnityCreated(UnityWidgetController controller) {
     _unityController = controller;
+    _isUnityReady = true;
   }
 
   void onUnityMessage(dynamic message) {
@@ -128,51 +129,108 @@ class _AdminPageState extends State<AdminPage> {
   }
 
   void _importObject() async {
+    if (!_isUnityReady) {
+      print("Unity is not ready.");
+      return;
+    }
+
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['obj', 'fbx', 'glb'], // List your supported formats
+      allowedExtensions: ['obj', 'fbx', 'glb'],
     );
 
     if (result != null) {
       Uint8List? fileBytes = result.files.first.bytes;
 
       if (fileBytes != null) {
-        // Send the 3D model file to Unity
-        _unityController.postMessage(
-            'SceneController', 'Import3DObject', base64Encode(fileBytes));
+        String base64String = base64Encode(fileBytes);
+        print('File picked: ${result.files.first.name}');
+        _unityController.postMessage('SceneController', 'LoadModelFromBase64', base64String);
+
       } else {
-        // Handle the case when fileBytes is null
         print('Failed to retrieve file bytes.');
       }
     } else {
-      // User canceled the picker
       print('File picking was canceled.');
     }
   }
 
+  // void _importObject() async {
+  //   if (!_isUnityReady) {
+  //     print("Unity is not ready.");
+  //     return;
+  //   }
+
+  //   FilePickerResult? result = await FilePicker.platform.pickFiles(
+  //     type: FileType.custom,
+  //     allowedExtensions: ['obj', 'fbx', 'glb'],
+  //   );
+
+  //   if (result != null) {
+  //     Uint8List? fileBytes = result.files.first.bytes;
+  //     int fileSize = result.files.first.size;
+
+  //     if (fileBytes != null) {
+  //       print('File picked: ${result.files.first.name}, size: $fileSize bytes');
+  //       _unityController.postMessage(
+  //           'SceneController', 'Import3DObject', base64Encode(fileBytes));
+  //     } else {
+  //       print('Failed to retrieve file bytes.');
+  //     }
+  //   } else {
+  //     print('File picking was canceled.');
+  //   }
+  // }
+
   void _addStartPoint() {
-    _unityController.postMessage('SceneController', 'AddStartPoint', '');
+    if (_isUnityReady) {
+      _unityController.postMessage('SceneController', 'AddStartPoint', '');
+    } else {
+      print("Unity is not ready.");
+    }
   }
 
   void _addEndPoint() {
-    _unityController.postMessage('SceneController', 'AddDestinationPoint', '');
+    if (_isUnityReady) {
+      _unityController.postMessage(
+          'SceneController', 'AddDestinationPoint', '');
+    } else {
+      print("Unity is not ready.");
+    }
   }
 
   void _addNavigationLine() {
-    // Example positions for the navigation line, you might want to customize this
-    _unityController.postMessage('SceneController', 'AddNavigationLine',
-        '{"start": [0, 0, 0], "end": [1, 0, 1]}');
+    if (_isUnityReady) {
+      _unityController.postMessage('SceneController', 'AddNavigationLine',
+          '{"start": [0, 0, 0], "end": [1, 0, 1]}');
+    } else {
+      print("Unity is not ready.");
+    }
   }
 
   void _hideObject() {
-    _unityController.postMessage('SceneController', 'HideMeshRenderer', '');
+    if (_isUnityReady) {
+      _unityController.postMessage('SceneController', 'HideMeshRenderer', '');
+    } else {
+      print("Unity is not ready.");
+    }
   }
 
   void _deleteObject() {
-    _unityController.postMessage('SceneController', 'DeleteSelectedObject', '');
+    if (_isUnityReady) {
+      _unityController.postMessage(
+          'SceneController', 'DeleteSelectedObject', '');
+    } else {
+      print("Unity is not ready.");
+    }
   }
 
   void _exportScene() {
-    _unityController.postMessage('SceneController', 'ExportScene', 'Downloads');
+    if (_isUnityReady) {
+      _unityController.postMessage(
+          'SceneController', 'ExportScene', 'Downloads');
+    } else {
+      print("Unity is not ready.");
+    }
   }
 }

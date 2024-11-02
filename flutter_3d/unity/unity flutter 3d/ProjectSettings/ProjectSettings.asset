@@ -162,6 +162,7 @@ PlayerSettings:
   androidMaxAspectRatio: 2.1
   applicationIdentifier:
     Android: com.DefaultCompany.unityflutter3d
+    Standalone: com.DefaultCompany.unity-flutter-3d
   buildNumber:
     Standalone: 0
     VisionOS: 0
