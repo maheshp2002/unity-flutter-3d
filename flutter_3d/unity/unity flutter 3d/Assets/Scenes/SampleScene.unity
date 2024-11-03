@@ -399,7 +399,7 @@ MonoBehaviour:
   defaultMaterial: {fileID: 2100000, guid: d72fa7eb3879f4941b0571f01f6182ba, type: 2}
   startPrefab: {fileID: 720988653777492618, guid: 107f982fd00526840a16067a479b5d3c, type: 3}
   destinationPrefab: {fileID: 4044515222399692613, guid: 66c13dabc703ecc4e97559af47b15b23, type: 3}
-  navigationPrefab: {fileID: 4043597632298659368, guid: 01647ba5005fa3a4092bae4cd7547553, type: 3}
+  navigationPrefab: {fileID: 2110424101492314995, guid: 57f77185dbaf3994582d97628c37d386, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

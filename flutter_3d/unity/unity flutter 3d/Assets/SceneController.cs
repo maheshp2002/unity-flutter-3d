@@ -56,12 +56,20 @@ public class SceneController : MonoBehaviour
 
     private void SelectObject(GameObject obj)
     {
-        obj.GetComponent<Renderer>().material.color = Color.yellow; // Highlight selected object
+        var renderer = obj.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.material.color = Color.yellow; // Highlight selected object
+        }
     }
 
     private void DeselectObject(GameObject obj)
     {
-        obj.GetComponent<Renderer>().material.color = Color.white; // Reset color
+        var renderer = obj.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.material.color = Color.white; // Reset color
+        }
     }
 
     private void HandleObjectManipulation()
@@ -198,7 +206,30 @@ public class SceneController : MonoBehaviour
             {
                 AssignDefaultShader(importedModel);
                 importedModel.transform.position = Vector3.zero;
-                importedModel.AddComponent<BoxCollider>();
+
+
+                // Set scale to positive values if necessary
+                Vector3 absoluteScale = new Vector3(
+                    Mathf.Abs(importedModel.transform.localScale.x),
+                    Mathf.Abs(importedModel.transform.localScale.y),
+                    Mathf.Abs(importedModel.transform.localScale.z)
+                );
+                importedModel.transform.localScale = absoluteScale;
+
+                // Add BoxCollider or MeshCollider
+                if (HasNegativeScale(importedModel))
+                {
+                    MeshCollider meshCollider = importedModel.AddComponent<MeshCollider>();
+                    meshCollider.convex = true;
+                }
+                else
+                {
+                    BoxCollider boxCollider = importedModel.AddComponent<BoxCollider>();
+                    boxCollider.center = importedModel.GetComponentInChildren<Renderer>().bounds.center - importedModel.transform.position;
+                    boxCollider.size = CalculateBounds(importedModel);
+                }
+
+                importedModel.tag = "ImportedObject";
                 spawnedObjects.Add(importedModel);
             }
             else
@@ -209,37 +240,26 @@ public class SceneController : MonoBehaviour
         yield return null;
     }
 
+    // Helper method to check if an object has any negative scale values
+    private bool HasNegativeScale(GameObject obj)
+    {
+        Vector3 scale = obj.transform.localScale;
+        return scale.x < 0 || scale.y < 0 || scale.z < 0;
+    }
 
+    // Helper method to calculate the bounds of the model for the BoxCollider
+    private Vector3 CalculateBounds(GameObject model)
+    {
+        Bounds bounds = new Bounds(model.transform.position, Vector3.zero);
+        MeshRenderer[] renderers = model.GetComponentsInChildren<MeshRenderer>();
+        foreach (MeshRenderer renderer in renderers)
+        {
+            bounds.Encapsulate(renderer.bounds);
+        }
 
-    // Function to import 3D object from Flutter
-    // public void Import3DObject(string base64Model)
-    // {
-    //     byte[] modelData = Convert.FromBase64String(base64Model);
-
-    //     #if UNITY_WEBGL
-    //     // Use WebGL-friendly approach to load model (e.g., send model to JS for processing)
-    //     Debug.Log("Model import not directly supported in WebGL. Use JavaScript bridge if needed.");
-    //     #else
-    //     // Save the data to a temporary .obj file
-    //     string tempPath = System.IO.Path.Combine(Application.persistentDataPath, "tempModel.obj");
-    //     System.IO.File.WriteAllBytes(tempPath, modelData);
-
-    //     // Load the .obj file using OBJLoader
-    //     GameObject importedModel = objLoader.Load(tempPath); 
-
-    //     if (importedModel != null)
-    //     {
-    //         AssignDefaultShader(importedModel);
-    //         importedModel.transform.position = Vector3.zero;
-    //         importedModel.AddComponent<BoxCollider>();
-    //         spawnedObjects.Add(importedModel);
-    //     }
-    //     else
-    //     {
-    //         Debug.LogError("Failed to load the 3D model.");
-    //     }
-    //     #endif
-    // }
+        // Use absolute values to avoid negative collider sizes
+        return new Vector3(Mathf.Abs(bounds.size.x), Mathf.Abs(bounds.size.y), Mathf.Abs(bounds.size.z));
+    }
 
     // Assigns a default white color shader to the imported model if it lacks one
     private void AssignDefaultShader(GameObject obj)

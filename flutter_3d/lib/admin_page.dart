@@ -155,33 +155,6 @@ class _AdminPageState extends State<AdminPage> {
     }
   }
 
-  // void _importObject() async {
-  //   if (!_isUnityReady) {
-  //     print("Unity is not ready.");
-  //     return;
-  //   }
-
-  //   FilePickerResult? result = await FilePicker.platform.pickFiles(
-  //     type: FileType.custom,
-  //     allowedExtensions: ['obj', 'fbx', 'glb'],
-  //   );
-
-  //   if (result != null) {
-  //     Uint8List? fileBytes = result.files.first.bytes;
-  //     int fileSize = result.files.first.size;
-
-  //     if (fileBytes != null) {
-  //       print('File picked: ${result.files.first.name}, size: $fileSize bytes');
-  //       _unityController.postMessage(
-  //           'SceneController', 'Import3DObject', base64Encode(fileBytes));
-  //     } else {
-  //       print('Failed to retrieve file bytes.');
-  //     }
-  //   } else {
-  //     print('File picking was canceled.');
-  //   }
-  // }
-
   void _addStartPoint() {
     if (_isUnityReady) {
       _unityController.postMessage('SceneController', 'AddStartPoint', '');

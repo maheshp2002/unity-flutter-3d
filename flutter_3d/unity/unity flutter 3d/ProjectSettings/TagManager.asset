@@ -5,6 +5,7 @@ TagManager:
   serializedVersion: 2
   tags:
   - NavigationLine
+  - ImportedObject
   layers:
   - Default
   - TransparentFX
