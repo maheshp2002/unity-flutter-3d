@@ -76,68 +76,144 @@ public class SceneController : MonoBehaviour
     {
         if (selectedObject == null) return;
 
-        // Rotate object
+        float rotationSpeed = 100.0f;
+        float scaleSpeed = 0.01f;
+        float moveSpeed = 0.1f;
+
+        // ----- Rotation -----
+        float mouseX = Input.GetAxis("Mouse X");
+        float mouseY = Input.GetAxis("Mouse Y");
+
         if (Input.GetKey(KeyCode.Z))
         {
-            float rotationSpeed = 100.0f;
-            float horizontal = Input.GetAxis("Mouse X") * rotationSpeed * Time.deltaTime;
-            selectedObject.transform.Rotate(Vector3.up, -horizontal, Space.World);
+            // Rotate around Y-axis
+            selectedObject.transform.Rotate(Vector3.up, -mouseX * rotationSpeed * Time.deltaTime, Space.World);
+        }
+        if (Input.GetKey(KeyCode.X))
+        {
+            // Rotate around X-axis
+            selectedObject.transform.Rotate(Vector3.right, mouseY * rotationSpeed * Time.deltaTime, Space.World);
+        }
+        if (Input.GetKey(KeyCode.C))
+        {
+            // Rotate around Z-axis
+            selectedObject.transform.Rotate(Vector3.forward, mouseX * rotationSpeed * Time.deltaTime, Space.World);
         }
 
-        // Scale object
-        if (Input.GetKey(KeyCode.LeftControl) && Input.GetKey(KeyCode.UpArrow))
+        // ----- Flipping -----
+        if (Input.GetKeyDown(KeyCode.F1))
         {
-            float scaleSpeed = 0.01f;
-            if (selectedObject.CompareTag("NavigationLine"))
-            {
-                selectedObject.transform.localScale += new Vector3(scaleSpeed, 0, 0); // Scale length (X-axis)
-            }
-            else
-            {
-                selectedObject.transform.localScale += new Vector3(scaleSpeed, scaleSpeed, scaleSpeed); // Uniform scaling
-            }
+            // Flip along X-axis
+            selectedObject.transform.localScale = new Vector3(
+                -selectedObject.transform.localScale.x,
+                selectedObject.transform.localScale.y,
+                selectedObject.transform.localScale.z
+            );
         }
-        else if (Input.GetKey(KeyCode.LeftControl) && Input.GetKey(KeyCode.DownArrow))
+        if (Input.GetKeyDown(KeyCode.F2))
         {
-            float scaleSpeed = 0.01f;
-            if (selectedObject.CompareTag("NavigationLine"))
-            {
-                selectedObject.transform.localScale -= new Vector3(scaleSpeed, 0, 0); // Scale length (X-axis)
-            }
-            else
-            {
-                selectedObject.transform.localScale -= new Vector3(scaleSpeed, scaleSpeed, scaleSpeed); // Uniform scaling
-            }
+            // Flip along Y-axis
+            selectedObject.transform.localScale = new Vector3(
+                selectedObject.transform.localScale.x,
+                -selectedObject.transform.localScale.y,
+                selectedObject.transform.localScale.z
+            );
         }
-
-        // Scale width (Z-axis) of Navigation Line
-        if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKey(KeyCode.RightArrow))
+        if (Input.GetKeyDown(KeyCode.F3))
         {
-            float scaleSpeed = 0.01f;
-            if (selectedObject.CompareTag("NavigationLine"))
-            {
-                selectedObject.transform.localScale += new Vector3(0, 0, scaleSpeed); // Scale width (Z-axis)
-            }
-        }
-        else if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKey(KeyCode.LeftArrow))
-        {
-            float scaleSpeed = 0.01f;
-            if (selectedObject.CompareTag("NavigationLine"))
-            {
-                selectedObject.transform.localScale -= new Vector3(0, 0, scaleSpeed); // Scale width (Z-axis)
-            }
+            // Flip along Z-axis
+            selectedObject.transform.localScale = new Vector3(
+                selectedObject.transform.localScale.x,
+                selectedObject.transform.localScale.y,
+                -selectedObject.transform.localScale.z
+            );
         }
 
-        // Move object
+
+        // ----- Scaling -----
+        // Uniform scale
+        if (Input.GetKey(KeyCode.U))
+        {
+            if (Input.GetKey(KeyCode.UpArrow))
+            {
+                selectedObject.transform.localScale += new Vector3(scaleSpeed, scaleSpeed, scaleSpeed);
+            }
+            else if (Input.GetKey(KeyCode.DownArrow))
+            {
+                selectedObject.transform.localScale -= new Vector3(scaleSpeed, scaleSpeed, scaleSpeed);
+            }
+        }
+        else
+        {
+            // Individual axis scaling
+            // Scale X-axis
+            if (Input.GetKey(KeyCode.LeftControl) && Input.GetKey(KeyCode.UpArrow))
+            {
+                selectedObject.transform.localScale += new Vector3(scaleSpeed, 0, 0);
+            }
+            else if (Input.GetKey(KeyCode.LeftControl) && Input.GetKey(KeyCode.DownArrow))
+            {
+                selectedObject.transform.localScale -= new Vector3(scaleSpeed, 0, 0);
+            }
+
+            // Scale Y-axis
+            if (Input.GetKey(KeyCode.RightControl) && Input.GetKey(KeyCode.UpArrow))
+            {
+                selectedObject.transform.localScale += new Vector3(0, scaleSpeed, 0);
+            }
+            else if (Input.GetKey(KeyCode.RightControl) && Input.GetKey(KeyCode.DownArrow))
+            {
+                selectedObject.transform.localScale -= new Vector3(0, scaleSpeed, 0);
+            }
+
+            // Scale Z-axis
+            if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKey(KeyCode.RightArrow))
+            {
+                selectedObject.transform.localScale += new Vector3(0, 0, scaleSpeed);
+            }
+            else if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKey(KeyCode.LeftArrow))
+            {
+                selectedObject.transform.localScale -= new Vector3(0, 0, scaleSpeed);
+            }
+        }
+        // Prevent negative or too small scaling
+        selectedObject.transform.localScale = new Vector3(
+            Mathf.Max(selectedObject.transform.localScale.x, 0.1f),
+            Mathf.Max(selectedObject.transform.localScale.y, 0.1f),
+            Mathf.Max(selectedObject.transform.localScale.z, 0.1f)
+        );
+
+        // ----- Movement -----
         if (Input.GetMouseButton(1))
         {
-            float moveSpeed = 0.1f;
             float horizontal = Input.GetAxis("Mouse X") * moveSpeed;
             float vertical = Input.GetAxis("Mouse Y") * moveSpeed;
-            selectedObject.transform.Translate(new Vector3(horizontal, 0, vertical), Space.World);
+            float upDown = 0f;
+
+            // Use Q and E keys to move up and down
+            if (Input.GetKey(KeyCode.Q))
+            {
+                upDown = moveSpeed;
+            }
+            else if (Input.GetKey(KeyCode.E))
+            {
+                upDown = -moveSpeed;
+            }
+
+            // Move object along X, Y, and Z axes
+            if (Input.GetKey(KeyCode.R)) // Use R key to move up along Y-axis
+            {
+                selectedObject.transform.Translate(Vector3.up * moveSpeed, Space.World);
+            }
+            else if (Input.GetKey(KeyCode.F)) // Use F key to move down along Y-axis
+            {
+                selectedObject.transform.Translate(Vector3.down * moveSpeed, Space.World);
+            }
+
+            selectedObject.transform.Translate(new Vector3(horizontal, upDown, vertical), Space.World);
         }
 
-        // Delete object
+        // ----- Delete Object -----
         if (Input.GetKeyDown(KeyCode.Delete) && selectedObject != null)
         {
             spawnedObjects.Remove(selectedObject); // Remove from list
@@ -207,14 +283,22 @@ public class SceneController : MonoBehaviour
                 AssignDefaultShader(importedModel);
                 importedModel.transform.position = Vector3.zero;
 
+                // Rotate 180 degrees around the Y-axis (adjust as needed)
+                importedModel.transform.Rotate(0, 180, 0);
 
-                // Set scale to positive values if necessary
-                Vector3 absoluteScale = new Vector3(
+                // Ensure positive scaling to avoid inverted normals
+                importedModel.transform.localScale = new Vector3(
                     Mathf.Abs(importedModel.transform.localScale.x),
                     Mathf.Abs(importedModel.transform.localScale.y),
                     Mathf.Abs(importedModel.transform.localScale.z)
                 );
-                importedModel.transform.localScale = absoluteScale;
+                // // Set scale to positive values if necessary
+                // Vector3 absoluteScale = new Vector3(
+                //     Mathf.Abs(importedModel.transform.localScale.x),
+                //     Mathf.Abs(importedModel.transform.localScale.y),
+                //     Mathf.Abs(importedModel.transform.localScale.z)
+                // );
+                // importedModel.transform.localScale = absoluteScale;
 
                 // Add BoxCollider or MeshCollider
                 if (HasNegativeScale(importedModel))
