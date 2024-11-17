@@ -36,11 +36,11 @@ class _AdminPageState extends State<AdminPage> {
     'Right Ctrl + Down Arrow: Scale Down Along Y-axis',
     'Alt + Right Arrow: Scale Up Along Z-axis',
     'Alt + Left Arrow: Scale Down Along Z-axis',
-      'F1: Flip Object Along X-axis',
+    'F1: Flip Object Along X-axis',
     'F2: Flip Object Along Y-axis',
     'F3: Flip Object Along Z-axis',
-    'R: Move Object Up Along Y-axis',
-    'F: Move Object Down Along Y-axis',
+    'M: Move Object Up Along Y-axis',
+    'N: Move Object Down Along Y-axis',
     'Delete: Delete Selected Object',
     'T: Top View',
     'B: Bottom View',
@@ -71,14 +71,15 @@ class _AdminPageState extends State<AdminPage> {
               children: [
                 IconButton(
                   icon: Icon(
-                      _isHelpVisible ? Icons.expand_less : Icons.expand_more),
+                    _isHelpVisible ? Icons.expand_less : Icons.expand_more,
+                  ),
                   onPressed: () {
                     setState(() {
                       _isHelpVisible = !_isHelpVisible;
                     });
                   },
                 ),
-                if (_isHelpVisible) ...[
+                if (_isHelpVisible)
                   Expanded(
                     child: Container(
                       padding: EdgeInsets.all(10),
@@ -91,7 +92,6 @@ class _AdminPageState extends State<AdminPage> {
                       ),
                     ),
                   ),
-                ],
               ],
             ),
           ),
@@ -105,16 +105,8 @@ class _AdminPageState extends State<AdminPage> {
             child: Text("Import Object"),
           ),
           ElevatedButton(
-            onPressed: _addStartPoint,
-            child: Text("Add Start Point"),
-          ),
-          ElevatedButton(
-            onPressed: _addEndPoint,
-            child: Text("Add Destination"),
-          ),
-          ElevatedButton(
-            onPressed: _addNavigationLine,
-            child: Text("Add Navigation Line"),
+            onPressed: _showUnityUI,
+            child: Text("Add Navigation Point"),
           ),
           ElevatedButton(
             onPressed: _hideObject,
@@ -160,7 +152,6 @@ class _AdminPageState extends State<AdminPage> {
         String base64String = base64Encode(fileBytes);
         print('File picked: ${result.files.first.name}');
         _unityController.postMessage('SceneController', 'LoadModelFromBase64', base64String);
-
       } else {
         print('Failed to retrieve file bytes.');
       }
@@ -169,27 +160,24 @@ class _AdminPageState extends State<AdminPage> {
     }
   }
 
-  void _addStartPoint() {
+  void _showUnityUI() {
     if (_isUnityReady) {
-      _unityController.postMessage('SceneController', 'AddStartPoint', '');
+      _unityController.postMessage('SceneController', 'ShowUnityUI', '');
     } else {
       print("Unity is not ready.");
     }
   }
 
-  void _addEndPoint() {
+  void _addNavigationPoint(String label, bool isSource, bool isDestination, double x, double y, double z) {
     if (_isUnityReady) {
-      _unityController.postMessage(
-          'SceneController', 'AddDestinationPoint', '');
-    } else {
-      print("Unity is not ready.");
-    }
-  }
-
-  void _addNavigationLine() {
-    if (_isUnityReady) {
-      _unityController.postMessage('SceneController', 'AddNavigationLine',
-          '{"start": [0, 0, 0], "end": [1, 0, 1]}');
+      Map<String, dynamic> pointData = {
+        "label": label,
+        "isSource": isSource,
+        "isDestination": isDestination,
+        "position": [x, y, z],
+      };
+      String json = jsonEncode(pointData);
+      _unityController.postMessage('SceneController', 'AddNavigationPoint', json);
     } else {
       print("Unity is not ready.");
     }
@@ -205,8 +193,7 @@ class _AdminPageState extends State<AdminPage> {
 
   void _deleteObject() {
     if (_isUnityReady) {
-      _unityController.postMessage(
-          'SceneController', 'DeleteSelectedObject', '');
+      _unityController.postMessage('SceneController', 'DeleteSelectedObject', '');
     } else {
       print("Unity is not ready.");
     }
@@ -214,8 +201,7 @@ class _AdminPageState extends State<AdminPage> {
 
   void _exportScene() {
     if (_isUnityReady) {
-      _unityController.postMessage(
-          'SceneController', 'ExportScene', 'Downloads');
+      _unityController.postMessage('SceneController', 'ExportScene', 'Downloads');
     } else {
       print("Unity is not ready.");
     }

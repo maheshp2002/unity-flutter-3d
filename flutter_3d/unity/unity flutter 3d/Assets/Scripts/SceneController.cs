@@ -4,19 +4,20 @@ using UnityEngine;
 using UnityEngine.Networking;
 using System.Collections;
 using System;
+using TMPro;
 using Dummiesman;
+using FlutterUnityIntegration;
 
 public class SceneController : MonoBehaviour
 {
     [SerializeField] private Material defaultMaterial; 
-    public GameObject startPrefab;
-    public GameObject destinationPrefab;
-    public GameObject navigationPrefab;
+    public GameObject navigationPointPrefab;
     private List<GameObject> spawnedObjects = new List<GameObject>();
     private Camera mainCamera;
     private GameObject selectedObject;
     private GameObject lastSelectedObject;
     private OBJLoader objLoader = new OBJLoader();
+    public GameObject canvasUI;
 
     void Start()
     {
@@ -28,6 +29,46 @@ public class SceneController : MonoBehaviour
         HandleObjectSelection();
         HandleObjectManipulation();
         HandleCameraControls();
+    }
+
+    // Method to add a navigation point dynamically
+    public void CreateNavigationPoint(string label, bool isSource, bool isDestination)
+    {
+        try
+        {
+            // Instantiate the navigation point prefab at the current camera position
+            Vector3 spawnPosition = mainCamera.transform.position + mainCamera.transform.forward * 2;
+            GameObject newPoint = Instantiate(navigationPointPrefab, spawnPosition, Quaternion.identity);
+
+            // Set metadata using the NavigationPoint script
+            NavigationPoint navPoint = newPoint.GetComponent<NavigationPoint>();
+            navPoint.SetData(label, isSource, isDestination);
+
+            // Update the label text
+            TextMeshPro labelComponent = newPoint.transform.Find("LabelText").GetComponent<TextMeshPro>();
+            labelComponent.text = label;
+
+            // Align the text above the navigation point
+            labelComponent.transform.localPosition = new Vector3(0, 1.0f, 0);
+
+            // Add to the list of spawned objects
+            spawnedObjects.Add(newPoint);
+            newPoint.name = label;
+
+            Debug.Log($"Added Navigation Point: {label} (Source: {isSource}, Destination: {isDestination})");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Failed to create navigation point: {ex.Message}");
+        }
+    }
+
+    public void ShowUnityUI()
+    {
+        if (canvasUI != null)
+        {
+            canvasUI.SetActive(true);
+        }
     }
 
     private void HandleObjectSelection()
@@ -201,11 +242,11 @@ public class SceneController : MonoBehaviour
             }
 
             // Move object along X, Y, and Z axes
-            if (Input.GetKey(KeyCode.R)) // Use R key to move up along Y-axis
+            if (Input.GetKey(KeyCode.M)) // Use M key to move up along Y-axis
             {
                 selectedObject.transform.Translate(Vector3.up * moveSpeed, Space.World);
             }
-            else if (Input.GetKey(KeyCode.F)) // Use F key to move down along Y-axis
+            else if (Input.GetKey(KeyCode.N)) // Use N key to move down along Y-axis
             {
                 selectedObject.transform.Translate(Vector3.down * moveSpeed, Space.World);
             }
@@ -283,23 +324,22 @@ public class SceneController : MonoBehaviour
                 AssignDefaultShader(importedModel);
                 importedModel.transform.position = Vector3.zero;
 
-                // Rotate 180 degrees around the Y-axis (adjust as needed)
-                importedModel.transform.Rotate(0, 180, 0);
+                // Send scale and rotation information back to Flutter
+                string logMessages = $"Model Scale: {importedModel.transform.localScale}, Rotation: {importedModel.transform.rotation.eulerAngles}";
+                UnityMessageManager.Instance.SendMessageToFlutter(logMessages); 
 
-                // Ensure positive scaling to avoid inverted normals
-                importedModel.transform.localScale = new Vector3(
-                    Mathf.Abs(importedModel.transform.localScale.x),
-                    Mathf.Abs(importedModel.transform.localScale.y),
-                    Mathf.Abs(importedModel.transform.localScale.z)
-                );
-                // // Set scale to positive values if necessary
-                // Vector3 absoluteScale = new Vector3(
-                //     Mathf.Abs(importedModel.transform.localScale.x),
-                //     Mathf.Abs(importedModel.transform.localScale.y),
-                //     Mathf.Abs(importedModel.transform.localScale.z)
-                // );
-                // importedModel.transform.localScale = absoluteScale;
+                #if UNITY_WEBGL
+                    // Flip the model along the X-axis to correct the mirroring issue
+                    importedModel.transform.localScale = new Vector3(
+                        -importedModel.transform.localScale.x,
+                        importedModel.transform.localScale.y,
+                        importedModel.transform.localScale.z
+                    );
+                #endif
 
+                #if UNITY_WEBGL
+                    importedModel.transform.Rotate(0, 180, 0);
+                #endif
                 // Add BoxCollider or MeshCollider
                 if (HasNegativeScale(importedModel))
                 {
@@ -315,6 +355,10 @@ public class SceneController : MonoBehaviour
 
                 importedModel.tag = "ImportedObject";
                 spawnedObjects.Add(importedModel);
+
+                // Send scale and rotation information back to Flutter
+                string logMessage = $"Model Scale: {importedModel.transform.localScale}, Rotation: {importedModel.transform.rotation.eulerAngles}";
+                UnityMessageManager.Instance.SendMessageToFlutter(logMessage); 
             }
             else
             {
@@ -373,32 +417,6 @@ public class SceneController : MonoBehaviour
         }
     }
 
-    public void AddStartPoint()
-    {
-        GameObject startPoint = Instantiate(startPrefab);
-        spawnedObjects.Add(startPoint);
-    }
-
-    public void AddDestinationPoint()
-    {
-        GameObject destinationPoint = Instantiate(destinationPrefab);
-        spawnedObjects.Add(destinationPoint);
-    }
-
-    public void AddNavigationLine(string json)
-    {
-        var data = JsonUtility.FromJson<NavigationLineData>(json);
-        GameObject lineObject = Instantiate(navigationPrefab);
-
-        lineObject.transform.position = new Vector3(data.start[0], data.start[1], data.start[2]);
-        Vector3 direction = new Vector3(data.end[0], data.end[1], data.end[2]) - lineObject.transform.position;
-        float length = direction.magnitude;
-        lineObject.transform.localScale = new Vector3(length, 1, 1);
-        lineObject.transform.LookAt(new Vector3(data.end[0], data.end[1], data.end[2]));
-        lineObject.tag = "NavigationLine";
-        lineObject.AddComponent<BoxCollider>();
-    }
-
     public void HideMeshRenderer()
     {
         if (selectedObject != null)
@@ -441,10 +459,12 @@ public class SceneController : MonoBehaviour
     }
 
     [System.Serializable]
-    public class NavigationLineData
+    public class PointData
     {
-        public float[] start;
-        public float[] end;
+        public string label;
+        public bool isSource;
+        public bool isDestination;
+        public float[] position;
     }
 
     [System.Serializable]
