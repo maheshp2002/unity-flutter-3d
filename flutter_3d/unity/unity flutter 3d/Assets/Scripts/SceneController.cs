@@ -340,6 +340,7 @@ public class SceneController : MonoBehaviour
                 #if UNITY_WEBGL
                     importedModel.transform.Rotate(0, 180, 0);
                 #endif
+
                 // Add BoxCollider or MeshCollider
                 if (HasNegativeScale(importedModel))
                 {
@@ -362,7 +363,7 @@ public class SceneController : MonoBehaviour
             }
             else
             {
-                Debug.LogError("Failed to load the 3D model.");
+                Debug.LogError("Failed to load the 3D model .");
             }
         }
         yield return null;
