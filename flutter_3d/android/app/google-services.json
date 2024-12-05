@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "21566211803",
+    "project_id": "dummy-4a4e2",
+    "storage_bucket": "dummy-4a4e2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:21566211803:android:2c97190731c56fcf9daefe",
+        "android_client_info": {
+          "package_name": "com.example.flutter_3d"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5PhCAp4SOSPhRiJ3NIxS6jDV3LK-Fu_I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

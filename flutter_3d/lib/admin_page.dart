@@ -120,6 +120,10 @@ class _AdminPageState extends State<AdminPage> {
             onPressed: _exportScene,
             child: Text("Export Scene"),
           ),
+          ElevatedButton(
+            onPressed: _importScene,
+            child: Text("Import Scene"),
+          ),
         ],
       ),
     );
@@ -151,7 +155,8 @@ class _AdminPageState extends State<AdminPage> {
       if (fileBytes != null) {
         String base64String = base64Encode(fileBytes);
         print('File picked: ${result.files.first.name}');
-        _unityController.postMessage('SceneController', 'LoadModelFromBase64', base64String);
+        _unityController.postMessage(
+            'SceneController', 'LoadModelFromBase64', base64String);
       } else {
         print('Failed to retrieve file bytes.');
       }
@@ -168,7 +173,8 @@ class _AdminPageState extends State<AdminPage> {
     }
   }
 
-  void _addNavigationPoint(String label, bool isSource, bool isDestination, double x, double y, double z) {
+  void _addNavigationPoint(String label, bool isSource, bool isDestination,
+      double x, double y, double z) {
     if (_isUnityReady) {
       Map<String, dynamic> pointData = {
         "label": label,
@@ -177,7 +183,8 @@ class _AdminPageState extends State<AdminPage> {
         "position": [x, y, z],
       };
       String json = jsonEncode(pointData);
-      _unityController.postMessage('SceneController', 'AddNavigationPoint', json);
+      _unityController.postMessage(
+          'SceneController', 'AddNavigationPoint', json);
     } else {
       print("Unity is not ready.");
     }
@@ -193,17 +200,48 @@ class _AdminPageState extends State<AdminPage> {
 
   void _deleteObject() {
     if (_isUnityReady) {
-      _unityController.postMessage('SceneController', 'DeleteSelectedObject', '');
+      _unityController.postMessage(
+          'SceneController', 'DeleteSelectedObject', '');
     } else {
       print("Unity is not ready.");
     }
   }
 
   void _exportScene() {
-    if (_isUnityReady) {
-      _unityController.postMessage('SceneController', 'ExportScene', 'Downloads');
-    } else {
+    if (!_isUnityReady) {
       print("Unity is not ready.");
+      return;
+    }
+
+    _unityController.postMessage('SceneController', 'ExportScene', '');
+  }
+
+  void _importScene() async {
+    if (!_isUnityReady) {
+      print("Unity is not ready.");
+      return;
+    }
+
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['zip'],
+    );
+
+    if (result != null) {
+      Uint8List? fileBytes = result.files.first.bytes;
+
+      if (fileBytes != null) {
+        // Convert the file bytes to base64
+        String base64String = base64Encode(fileBytes);
+
+        // Send the base64 string to Unity
+        _unityController.postMessage(
+            'SceneController', 'ImportSceneFromBase64', base64String);
+      } else {
+        print("Failed to retrieve file bytes.");
+      }
+    } else {
+      print("No file selected.");
     }
   }
 }

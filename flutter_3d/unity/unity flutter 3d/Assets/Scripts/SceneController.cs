@@ -7,6 +7,9 @@ using System;
 using TMPro;
 using Dummiesman;
 using FlutterUnityIntegration;
+using System.IO.Compression;
+using UnityEngine.EventSystems;
+
 
 public class SceneController : MonoBehaviour
 {
@@ -18,6 +21,7 @@ public class SceneController : MonoBehaviour
     private GameObject lastSelectedObject;
     private OBJLoader objLoader = new OBJLoader();
     public GameObject canvasUI;
+    private bool isInputLocked = false; // New variable to lock inputs
 
     void Start()
     {
@@ -26,9 +30,20 @@ public class SceneController : MonoBehaviour
 
     void Update()
     {
+                // Check if inputs are locked or UI is active
+        if (isInputLocked || EventSystem.current.currentSelectedGameObject != null)
+        {
+            return;
+        }
+
         HandleObjectSelection();
         HandleObjectManipulation();
         HandleCameraControls();
+    }
+
+    public void LockInput(bool lockInput)
+    {
+        isInputLocked = lockInput;
     }
 
     // Method to add a navigation point dynamically
@@ -39,6 +54,7 @@ public class SceneController : MonoBehaviour
             // Instantiate the navigation point prefab at the current camera position
             Vector3 spawnPosition = mainCamera.transform.position + mainCamera.transform.forward * 2;
             GameObject newPoint = Instantiate(navigationPointPrefab, spawnPosition, Quaternion.identity);
+            newPoint.tag = "NavigationLine";
 
             // Set metadata using the NavigationPoint script
             NavigationPoint navPoint = newPoint.GetComponent<NavigationPoint>();
@@ -341,17 +357,24 @@ public class SceneController : MonoBehaviour
                     importedModel.transform.Rotate(0, 180, 0);
                 #endif
 
-                // Add BoxCollider or MeshCollider
-                if (HasNegativeScale(importedModel))
+                // Add BoxCollider or MeshCollider if needed
+                if (!importedModel.GetComponent<Collider>())
                 {
-                    MeshCollider meshCollider = importedModel.AddComponent<MeshCollider>();
-                    meshCollider.convex = true;
+                    if (HasNegativeScale(importedModel))
+                    {
+                        MeshCollider meshCollider = importedModel.AddComponent<MeshCollider>();
+                        meshCollider.convex = true;
+                    }
+                    else
+                    {
+                        BoxCollider boxCollider = importedModel.AddComponent<BoxCollider>();
+                        boxCollider.center = importedModel.GetComponentInChildren<Renderer>().bounds.center - importedModel.transform.position;
+                        boxCollider.size = CalculateBounds(importedModel);
+                    }
                 }
                 else
                 {
-                    BoxCollider boxCollider = importedModel.AddComponent<BoxCollider>();
-                    boxCollider.center = importedModel.GetComponentInChildren<Renderer>().bounds.center - importedModel.transform.position;
-                    boxCollider.size = CalculateBounds(importedModel);
+                    Debug.Log($"Collider already exists on {importedModel.name}, skipping new collider addition.");
                 }
 
                 importedModel.tag = "ImportedObject";
@@ -430,33 +453,198 @@ public class SceneController : MonoBehaviour
         }
     }
 
-    public void ExportScene(string path)
+    public void ExportScene()
     {
-        SceneData sceneData = new SceneData();
-        foreach (GameObject obj in spawnedObjects)
+        try
         {
-            SceneObjectData objData = new SceneObjectData
+            // Prepare the scene data
+            SceneData sceneData = new SceneData();
+            foreach (GameObject obj in spawnedObjects)
             {
-                position = obj.transform.position,
-                rotation = obj.transform.rotation,
-                scale = obj.transform.localScale,
-                type = obj.tag
-            };
-            sceneData.objects.Add(objData);
+                if (obj.CompareTag("NavigationLine"))
+                {
+                    // Handle Navigation Points
+                    NavigationPoint navPoint = obj.GetComponent<NavigationPoint>();
+                    SceneObjectData navData = new SceneObjectData
+                    {
+                        position = obj.transform.position,
+                        rotation = obj.transform.rotation,
+                        scale = obj.transform.localScale,
+                        type = "NavigationLine",
+                        label = navPoint?.Label,
+                        isSource = navPoint?.IsSource ?? false,
+                        isDestination = navPoint?.IsDestination ?? false
+                    };
+                    sceneData.objects.Add(navData);
+                }
+                else if (obj.CompareTag("ImportedObject"))
+                {
+                    // Handle Imported 3D Objects
+                    SceneObjectData objData = new SceneObjectData
+                    {
+                        position = obj.transform.position,
+                        rotation = obj.transform.rotation,
+                        scale = obj.transform.localScale,
+                        type = obj.tag,
+                    };
+                    sceneData.objects.Add(objData);
+                }
+            }
+
+            // Serialize the scene data to JSON
+            string json = JsonUtility.ToJson(sceneData);
+
+            // Byte array to store the zip data
+            byte[] zipData;
+
+            // Create the ZIP archive
+            using (MemoryStream zipStream = new MemoryStream())
+            {
+                using (ZipArchive archive = new ZipArchive(zipStream, ZipArchiveMode.Create, true))
+                {
+                    // Add the JSON metadata file
+                    ZipArchiveEntry sceneDataEntry = archive.CreateEntry("sceneData.json");
+                    using (StreamWriter writer = new StreamWriter(sceneDataEntry.Open()))
+                    {
+                        writer.Write(json);
+                    }
+
+                    // Add 3D model files (OBJ)
+                    foreach (GameObject obj in spawnedObjects)
+                    {
+                        if (obj.CompareTag("ImportedObject"))
+                        {
+                            string objFileName = $"{obj.name}.obj";
+                            ZipArchiveEntry objEntry = archive.CreateEntry(objFileName);
+                            using (StreamWriter writer = new StreamWriter(objEntry.Open()))
+                            {
+                                OBJExporter.Export(obj, writer);
+                            }
+                        }
+                    }
+                }
+
+                // Save the zip data to the byte array
+                zipData = zipStream.ToArray();
+            }
+
+            // Trigger the browser download
+            #if UNITY_WEBGL
+            string base64Zip = Convert.ToBase64String(zipData);
+            Application.ExternalEval($@"
+                var blob = new Blob([Uint8Array.from(atob('{base64Zip}').split('').map(c => c.charCodeAt(0)))], {{ type: 'application/zip' }});
+                var link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'SceneExport.zip';
+                link.click();
+            ");
+            #endif
+
+            Debug.Log("Scene exported successfully.");
         }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Failed to export scene: {ex.Message}");
+        }
+    }
 
-        string json = JsonUtility.ToJson(sceneData);
+    public void ImportSceneFromBase64(string base64String)
+    {
+        try
+        {
+            ClearTempFolder();
+            
+            // Decode the base64 string into a byte array
+            byte[] zipBytes = Convert.FromBase64String(base64String);
 
-    #if UNITY_WEBGL
-        string fileName = "sceneData.json";
-        Application.ExternalEval($"var blob = new Blob([JSON.stringify({json})], {{ type: 'application/json' }}); " +
-                                 $"var link = document.createElement('a'); " +
-                                 $"link.href = URL.createObjectURL(blob); " +
-                                 $"link.download = '{fileName}'; " +
-                                 $"link.click();");
-    #else
-        System.IO.File.WriteAllText(path, json);
-    #endif
+            // Write the byte array to a temporary zip file
+            string tempZipPath = Path.Combine(Application.persistentDataPath, "TempScene.zip");
+            File.WriteAllBytes(tempZipPath, zipBytes);
+
+            // Extract and import the scene
+            ImportScene(tempZipPath);
+
+            // Clean up the temporary file
+            File.Delete(tempZipPath);
+
+            Debug.Log("Scene imported successfully from base64.");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Failed to import scene from base64: {ex.Message}");
+        }
+    }
+
+    public void ImportScene(string zipFilePath)
+    {
+        try
+        {
+            // Generate a unique folder name
+            string tempFolder = Path.Combine(Application.persistentDataPath, Guid.NewGuid().ToString());
+
+            Directory.CreateDirectory(tempFolder);
+
+            ZipFile.ExtractToDirectory(zipFilePath, tempFolder);
+
+            // Read the scene metadata
+            string jsonPath = Path.Combine(tempFolder, "sceneData.json");
+            if (!File.Exists(jsonPath))
+            {
+                Debug.LogError("Scene metadata not found.");
+                return;
+            }
+
+            string json = File.ReadAllText(jsonPath);
+            SceneData sceneData = JsonUtility.FromJson<SceneData>(json);
+
+            // Load objects from metadata
+            foreach (var objData in sceneData.objects)
+            {
+                if (objData.type == "NavigationLine")
+                {
+                    GameObject navPoint = Instantiate(navigationPointPrefab, objData.position, objData.rotation);
+                    navPoint.transform.localScale = objData.scale;
+                }
+                else
+                {
+                    string modelPath = Path.Combine(tempFolder, $"{objData.type}.obj");
+                    if (File.Exists(modelPath))
+                    {
+                        GameObject importedModel = objLoader.Load(modelPath);
+                        importedModel.transform.position = objData.position;
+                        importedModel.transform.rotation = objData.rotation;
+                        importedModel.transform.localScale = objData.scale;
+                        importedModel.tag = "ImportedObject";
+                    }
+                }
+            }
+
+            // Cleanup temporary folder
+            Directory.Delete(tempFolder, true);
+            Debug.Log("Scene imported successfully.");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Failed to import scene: {ex.Message}");
+        }
+    }
+
+    public void ClearTempFolder()
+    {
+        string tempFolder = Path.Combine(Application.persistentDataPath, "TempSceneImport");
+        if (Directory.Exists(tempFolder))
+        {
+            Directory.Delete(tempFolder, true); // Deletes all files and subdirectories
+            Debug.Log("Temporary folder cleared.");
+        }
+    }
+
+    private void SaveModelAsObj(GameObject obj, string filePath)
+    {
+        using (StreamWriter writer = new StreamWriter(filePath))
+        {
+            OBJExporter.Export(obj, writer);
+        }
     }
 
     [System.Serializable]
@@ -481,5 +669,49 @@ public class SceneController : MonoBehaviour
         public Quaternion rotation;
         public Vector3 scale;
         public string type;
+        public string label;
+        public bool isSource;
+        public bool isDestination;
+    }
+}
+
+public static class OBJExporter
+{
+    public static void Export(GameObject obj, StreamWriter writer)
+    {
+        MeshFilter meshFilter = obj.GetComponent<MeshFilter>();
+        if (meshFilter == null || meshFilter.sharedMesh == null)
+        {
+            Debug.LogError($"Failed to export {obj.name}: Missing MeshFilter or sharedMesh.");
+            return;
+        }
+        
+        if (meshFilter != null)
+        {
+            Mesh mesh = meshFilter.sharedMesh;
+            foreach (Vector3 v in mesh.vertices)
+            {
+                writer.WriteLine($"v {v.x} {v.y} {v.z}");
+            }
+
+            foreach (Vector3 n in mesh.normals)
+            {
+                writer.WriteLine($"vn {n.x} {n.y} {n.z}");
+            }
+
+            foreach (Vector2 uv in mesh.uv)
+            {
+                writer.WriteLine($"vt {uv.x} {uv.y}");
+            }
+
+            for (int submesh = 0; submesh < mesh.subMeshCount; submesh++)
+            {
+                int[] triangles = mesh.GetTriangles(submesh);
+                for (int i = 0; i < triangles.Length; i += 3)
+                {
+                    writer.WriteLine($"f {triangles[i] + 1} {triangles[i + 1] + 1} {triangles[i + 2] + 1}");
+                }
+            }
+        }
     }
 }

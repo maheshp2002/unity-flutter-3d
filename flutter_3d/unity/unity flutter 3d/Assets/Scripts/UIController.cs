@@ -38,6 +38,10 @@ public class UIController : MonoBehaviour
         if (canvasUI != null)
         {
             canvasUI.SetActive(false);
+            if (sceneController != null)
+            {
+                sceneController.LockInput(false); // Unlock input when hiding canvas
+            }
         }
     }
 
@@ -46,6 +50,10 @@ public class UIController : MonoBehaviour
         if (canvasUI != null)
         {
             canvasUI.SetActive(true);
+            if (sceneController != null)
+            {
+                sceneController.LockInput(true); // Lock input when showing canvas
+            }
         }
     }
 }
