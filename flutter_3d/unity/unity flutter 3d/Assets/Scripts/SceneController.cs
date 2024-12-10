@@ -93,7 +93,7 @@ public class SceneController : MonoBehaviour
         {
             Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
             if (Physics.Raycast(ray, out RaycastHit hit))
-            {
+            {   
                 if (selectedObject != null)
                 {
                     DeselectObject(selectedObject);
@@ -357,25 +357,29 @@ public class SceneController : MonoBehaviour
                     importedModel.transform.Rotate(0, 180, 0);
                 #endif
 
-                // Add BoxCollider or MeshCollider if needed
-                if (!importedModel.GetComponent<Collider>())
-                {
-                    if (HasNegativeScale(importedModel))
-                    {
-                        MeshCollider meshCollider = importedModel.AddComponent<MeshCollider>();
-                        meshCollider.convex = true;
-                    }
-                    else
-                    {
-                        BoxCollider boxCollider = importedModel.AddComponent<BoxCollider>();
-                        boxCollider.center = importedModel.GetComponentInChildren<Renderer>().bounds.center - importedModel.transform.position;
-                        boxCollider.size = CalculateBounds(importedModel);
-                    }
-                }
-                else
-                {
-                    Debug.Log($"Collider already exists on {importedModel.name}, skipping new collider addition.");
-                }
+                // Fit the imported model into the camera view
+                FitObjectToCamera(importedModel);
+
+                AddCollidersRecursively(importedModel);
+                // // Add BoxCollider or MeshCollider if needed
+                // if (!importedModel.GetComponent<Collider>())
+                // {
+                //     if (HasNegativeScale(importedModel))
+                //     {
+                //         MeshCollider meshCollider = importedModel.AddComponent<MeshCollider>();
+                //         meshCollider.convex = true;
+                //     }
+                //     else
+                //     {
+                //         BoxCollider boxCollider = importedModel.AddComponent<BoxCollider>();
+                //         boxCollider.center = importedModel.GetComponentInChildren<Renderer>().bounds.center - importedModel.transform.position;
+                //         boxCollider.size = CalculateBounds(importedModel);
+                //     }
+                // }
+                // else
+                // {
+                //     Debug.Log($"Collider already exists on {importedModel.name}, skipping new collider addition.");
+                // }
 
                 importedModel.tag = "ImportedObject";
                 spawnedObjects.Add(importedModel);
@@ -390,6 +394,44 @@ public class SceneController : MonoBehaviour
             }
         }
         yield return null;
+    }
+
+    private void AddCollidersRecursively(GameObject obj)
+    {
+        if (obj.GetComponent<MeshRenderer>() != null)
+        {
+            if (obj.GetComponent<Collider>() == null)
+            {
+                obj.AddComponent<BoxCollider>();
+            }
+        }
+        else
+        {
+            foreach (Transform child in obj.transform)
+            {
+                AddCollidersRecursively(child.gameObject);
+            }
+        }
+    }
+
+    private void FitObjectToCamera(GameObject obj)
+    {
+        // Get the bounds of the object
+        Bounds bounds = new Bounds(obj.transform.position, Vector3.zero);
+        Renderer[] renderers = obj.GetComponentsInChildren<Renderer>();
+        foreach (Renderer renderer in renderers)
+        {
+            bounds.Encapsulate(renderer.bounds);
+        }
+
+        // Calculate the required scale factor to fit into the camera's view
+        float maxDimension = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
+        float cameraViewHeight = 2.0f * Mathf.Tan(mainCamera.fieldOfView * 0.5f * Mathf.Deg2Rad) * mainCamera.transform.position.z;
+        float scaleFactor = cameraViewHeight / maxDimension;
+
+        // Apply the scale factor
+        obj.transform.localScale *= scaleFactor * 0.9f; // Slightly smaller to avoid clipping
+        obj.transform.position = Vector3.zero; // Center the object
     }
 
     // Helper method to check if an object has any negative scale values
