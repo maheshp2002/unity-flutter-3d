@@ -30,7 +30,7 @@ public class SceneController : MonoBehaviour
 
     void Update()
     {
-                // Check if inputs are locked or UI is active
+        // Check if inputs are locked or UI is active
         if (isInputLocked || EventSystem.current.currentSelectedGameObject != null)
         {
             return;
@@ -717,20 +717,70 @@ public class SceneController : MonoBehaviour
     }
 }
 
+// public static class OBJExporter
+// {
+//     public static void Export(GameObject obj, StreamWriter writer)
+//     {
+//         MeshFilter meshFilter = obj.GetComponent<MeshFilter>();
+//         if (meshFilter == null || meshFilter.sharedMesh == null)
+//         {
+//             Debug.LogError($"Failed to export {obj.name}: Missing MeshFilter or sharedMesh.");
+//             return;
+//         }
+        
+//         if (meshFilter != null)
+//         {
+//             Mesh mesh = meshFilter.sharedMesh;
+//             foreach (Vector3 v in mesh.vertices)
+//             {
+//                 writer.WriteLine($"v {v.x} {v.y} {v.z}");
+//             }
+
+//             foreach (Vector3 n in mesh.normals)
+//             {
+//                 writer.WriteLine($"vn {n.x} {n.y} {n.z}");
+//             }
+
+//             foreach (Vector2 uv in mesh.uv)
+//             {
+//                 writer.WriteLine($"vt {uv.x} {uv.y}");
+//             }
+
+//             for (int submesh = 0; submesh < mesh.subMeshCount; submesh++)
+//             {
+//                 int[] triangles = mesh.GetTriangles(submesh);
+//                 for (int i = 0; i < triangles.Length; i += 3)
+//                 {
+//                     writer.WriteLine($"f {triangles[i] + 1} {triangles[i + 1] + 1} {triangles[i + 2] + 1}");
+//                 }
+//             }
+//         }
+//     }
+// }
+
 public static class OBJExporter
 {
     public static void Export(GameObject obj, StreamWriter writer)
     {
-        MeshFilter meshFilter = obj.GetComponent<MeshFilter>();
-        if (meshFilter == null || meshFilter.sharedMesh == null)
+        // Recursively find all MeshFilters in the hierarchy
+        MeshFilter[] meshFilters = obj.GetComponentsInChildren<MeshFilter>();
+
+        if (meshFilters.Length == 0)
         {
-            Debug.LogError($"Failed to export {obj.name}: Missing MeshFilter or sharedMesh.");
+            Debug.LogError($"Failed to export {obj.name}: No MeshFilter or sharedMesh found in hierarchy.");
             return;
         }
-        
-        if (meshFilter != null)
+
+        foreach (MeshFilter meshFilter in meshFilters)
         {
             Mesh mesh = meshFilter.sharedMesh;
+            if (mesh == null)
+            {
+                Debug.LogWarning($"Skipping {meshFilter.gameObject.name}: Missing sharedMesh.");
+                continue;
+            }
+
+            // Write mesh data
             foreach (Vector3 v in mesh.vertices)
             {
                 writer.WriteLine($"v {v.x} {v.y} {v.z}");
