@@ -337,6 +337,10 @@ public class SceneController : MonoBehaviour
 
             if (importedModel != null)
             {
+                // Assign a unique name to the imported object
+                string uniqueName = Guid.NewGuid().ToString();
+                importedModel.name = uniqueName;
+                
                 AssignDefaultShader(importedModel);
                 importedModel.transform.position = Vector3.zero;
 
@@ -361,25 +365,6 @@ public class SceneController : MonoBehaviour
                 FitObjectToCamera(importedModel);
 
                 AddCollidersRecursively(importedModel);
-                // // Add BoxCollider or MeshCollider if needed
-                // if (!importedModel.GetComponent<Collider>())
-                // {
-                //     if (HasNegativeScale(importedModel))
-                //     {
-                //         MeshCollider meshCollider = importedModel.AddComponent<MeshCollider>();
-                //         meshCollider.convex = true;
-                //     }
-                //     else
-                //     {
-                //         BoxCollider boxCollider = importedModel.AddComponent<BoxCollider>();
-                //         boxCollider.center = importedModel.GetComponentInChildren<Renderer>().bounds.center - importedModel.transform.position;
-                //         boxCollider.size = CalculateBounds(importedModel);
-                //     }
-                // }
-                // else
-                // {
-                //     Debug.Log($"Collider already exists on {importedModel.name}, skipping new collider addition.");
-                // }
 
                 importedModel.tag = "ImportedObject";
                 spawnedObjects.Add(importedModel);
@@ -398,25 +383,37 @@ public class SceneController : MonoBehaviour
 
     private void AddCollidersRecursively(GameObject obj)
     {
-        if (obj.GetComponent<MeshRenderer>() != null)
+        // if (obj.GetComponent<MeshRenderer>() != null)
+        // {
+        //     if (obj.GetComponent<Collider>() == null)
+        //     {
+        //         obj.AddComponent<BoxCollider>();
+        //     }
+        // }
+        // else
+        // {
+        //     foreach (Transform child in obj.transform)
+        //     {
+        //         AddCollidersRecursively(child.gameObject);
+        //     }
+        // }
+
+        // Add a MeshCollider if the object has a MeshRenderer and no collider
+        if (obj.GetComponent<MeshRenderer>() != null && obj.GetComponent<Collider>() == null)
         {
-            if (obj.GetComponent<Collider>() == null)
-            {
-                obj.AddComponent<BoxCollider>();
-            }
+            MeshCollider meshCollider = obj.AddComponent<MeshCollider>();
+            meshCollider.convex = false; // Ensure proper collision for complex objects
         }
-        else
+
+        // Recursively add colliders to children
+        foreach (Transform child in obj.transform)
         {
-            foreach (Transform child in obj.transform)
-            {
-                AddCollidersRecursively(child.gameObject);
-            }
+            AddCollidersRecursively(child.gameObject);
         }
     }
 
     private void FitObjectToCamera(GameObject obj)
     {
-        // Get the bounds of the object
         Bounds bounds = new Bounds(obj.transform.position, Vector3.zero);
         Renderer[] renderers = obj.GetComponentsInChildren<Renderer>();
         foreach (Renderer renderer in renderers)
@@ -424,14 +421,12 @@ public class SceneController : MonoBehaviour
             bounds.Encapsulate(renderer.bounds);
         }
 
-        // Calculate the required scale factor to fit into the camera's view
-        float maxDimension = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
-        float cameraViewHeight = 2.0f * Mathf.Tan(mainCamera.fieldOfView * 0.5f * Mathf.Deg2Rad) * mainCamera.transform.position.z;
-        float scaleFactor = cameraViewHeight / maxDimension;
+        float objectSize = Mathf.Max(bounds.size.x, bounds.size.y, bounds.size.z);
+        float distance = objectSize / (2f * Mathf.Tan(mainCamera.fieldOfView * 0.5f * Mathf.Deg2Rad));
 
-        // Apply the scale factor
-        obj.transform.localScale *= scaleFactor * 0.9f; // Slightly smaller to avoid clipping
-        obj.transform.position = Vector3.zero; // Center the object
+        mainCamera.transform.position = bounds.center - distance * mainCamera.transform.forward;
+        mainCamera.nearClipPlane = Mathf.Max(0.01f, distance - objectSize * 1.5f);
+        mainCamera.farClipPlane = distance + objectSize * 2f;
     }
 
     // Helper method to check if an object has any negative scale values
@@ -527,7 +522,7 @@ public class SceneController : MonoBehaviour
                         position = obj.transform.position,
                         rotation = obj.transform.rotation,
                         scale = obj.transform.localScale,
-                        type = obj.tag,
+                        type = obj.name,
                     };
                     sceneData.objects.Add(objData);
                 }
@@ -623,13 +618,12 @@ public class SceneController : MonoBehaviour
         {
             // Generate a unique folder name
             string tempFolder = Path.Combine(Application.persistentDataPath, Guid.NewGuid().ToString());
-
             Directory.CreateDirectory(tempFolder);
-
+            // Extract the ZIP file
             ZipFile.ExtractToDirectory(zipFilePath, tempFolder);
-
             // Read the scene metadata
             string jsonPath = Path.Combine(tempFolder, "sceneData.json");
+
             if (!File.Exists(jsonPath))
             {
                 Debug.LogError("Scene metadata not found.");
@@ -639,6 +633,12 @@ public class SceneController : MonoBehaviour
             string json = File.ReadAllText(jsonPath);
             SceneData sceneData = JsonUtility.FromJson<SceneData>(json);
 
+            if (sceneData.objects == null || sceneData.objects.Count == 0)
+            {
+                Debug.LogError("No objects found in the scene metadata.");
+                return;
+            }
+
             // Load objects from metadata
             foreach (var objData in sceneData.objects)
             {
@@ -646,17 +646,46 @@ public class SceneController : MonoBehaviour
                 {
                     GameObject navPoint = Instantiate(navigationPointPrefab, objData.position, objData.rotation);
                     navPoint.transform.localScale = objData.scale;
+                    Debug.Log($"navPoint: {navPoint}");
                 }
                 else
                 {
                     string modelPath = Path.Combine(tempFolder, $"{objData.type}.obj");
+                    Debug.Log($"modelPath: {modelPath}");
+
                     if (File.Exists(modelPath))
                     {
+                        Debug.Log($"file exists");
                         GameObject importedModel = objLoader.Load(modelPath);
-                        importedModel.transform.position = objData.position;
-                        importedModel.transform.rotation = objData.rotation;
-                        importedModel.transform.localScale = objData.scale;
-                        importedModel.tag = "ImportedObject";
+
+                        if (importedModel != null)
+                        {
+                            // Find the object with MeshRenderer or MeshFilter
+                            GameObject meshObject = FindMeshObject(importedModel);
+
+                            if (meshObject != null)
+                            {
+                                // Apply transformations to the correct object
+                                meshObject.transform.position = objData.position;
+                                meshObject.transform.rotation = objData.rotation;
+                                meshObject.transform.localScale = objData.scale;
+                                importedModel.tag = "ImportedObject";
+
+                                // Ensure the object has a collider
+                                AddCollidersRecursively(meshObject);
+
+                                // Log details about the found object
+                                Debug.Log($"Mesh object found: {meshObject.name}, Position: {meshObject.transform.position}, Scale: {meshObject.transform.localScale}");
+                            }
+                            else
+                            {
+                                Debug.LogError($"No MeshRenderer or MeshFilter found in the hierarchy of {importedModel.name}");
+                            }
+                        }
+                        else
+                        {
+                            Debug.LogError($"Failed to load model from path: {modelPath}");
+                        }
                     }
                 }
             }
@@ -669,6 +698,28 @@ public class SceneController : MonoBehaviour
         {
             Debug.LogError($"Failed to import scene: {ex.Message}");
         }
+    }
+
+    private GameObject FindMeshObject(GameObject obj)
+    {
+        // Check if the current object has MeshRenderer or MeshFilter
+        if (obj.GetComponent<MeshRenderer>() != null || obj.GetComponent<MeshFilter>() != null)
+        {
+            return obj;
+        }
+
+        // Recursively check all children
+        foreach (Transform child in obj.transform)
+        {
+            GameObject found = FindMeshObject(child.gameObject);
+            if (found != null)
+            {
+                return found;
+            }
+        }
+
+        // If nothing is found, return null
+        return null;
     }
 
     public void ClearTempFolder()
