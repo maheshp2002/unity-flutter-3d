@@ -21,7 +21,7 @@ public class SceneController : MonoBehaviour
     private GameObject lastSelectedObject;
     private OBJLoader objLoader = new OBJLoader();
     public GameObject canvasUI;
-    private bool isInputLocked = false; // New variable to lock inputs
+    private bool isInputLocked = false; // Variable to lock inputs
 
     void Start()
     {
@@ -494,6 +494,9 @@ public class SceneController : MonoBehaviour
     {
         try
         {
+            // Sync object transformations before exporting
+            SyncObjectTransforms();
+
             // Prepare the scene data
             SceneData sceneData = new SceneData();
             foreach (GameObject obj in spawnedObjects)
@@ -523,7 +526,11 @@ public class SceneController : MonoBehaviour
                         rotation = obj.transform.rotation,
                         scale = obj.transform.localScale,
                         type = obj.name,
+                        isSource = false,
+                        isDestination = false
                     };
+                    Debug.Log("Exported Scene Data: " + objData);
+                    Debug.Log($"Object data: {obj.transform.position} \n\n {obj.transform.rotation} \n\n {obj.transform.localScale} \n\n {obj.transform}");
                     sceneData.objects.Add(objData);
                 }
             }
@@ -612,6 +619,24 @@ public class SceneController : MonoBehaviour
         }
     }
 
+    private void SyncObjectTransforms()
+    {
+        foreach (GameObject obj in spawnedObjects)
+        {
+            // Ensure the scene object is the same one being manipulated
+            if (obj != null)
+            {
+                obj.transform.position = GameObject.Find(obj.name).transform.position;
+                obj.transform.rotation = GameObject.Find(obj.name).transform.rotation;
+                obj.transform.localScale = GameObject.Find(obj.name).transform.localScale;
+            }
+            Debug.Log($"Current Transform - Pos: {obj.transform.position}, Rot: {obj.transform.rotation}, Scale: {obj.transform.localScale}");
+            Debug.LogError($"SceneObj: {sceneObj}\n{GameObject.Find(obj.name)}\n{obj.name}\n{sceneObj.transform.position}\n{sceneObj.transform.rotation}\n{sceneObj.transform.localScale}");
+        }
+        
+        Debug.LogError($"Reached here");
+    }
+
     public void ImportScene(string zipFilePath)
     {
         try
@@ -651,11 +676,9 @@ public class SceneController : MonoBehaviour
                 else
                 {
                     string modelPath = Path.Combine(tempFolder, $"{objData.type}.obj");
-                    Debug.Log($"modelPath: {modelPath}");
 
                     if (File.Exists(modelPath))
                     {
-                        Debug.Log($"file exists");
                         GameObject importedModel = objLoader.Load(modelPath);
 
                         if (importedModel != null)
