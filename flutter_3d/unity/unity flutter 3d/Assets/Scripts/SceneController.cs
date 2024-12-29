@@ -9,7 +9,7 @@ using Dummiesman;
 using FlutterUnityIntegration;
 using System.IO.Compression;
 using UnityEngine.EventSystems;
-
+using System.Linq; 
 
 public class SceneController : MonoBehaviour
 {
@@ -21,15 +21,22 @@ public class SceneController : MonoBehaviour
     private GameObject lastSelectedObject;
     private OBJLoader objLoader = new OBJLoader();
     public GameObject canvasUI;
-    private bool isInputLocked = false; // Variable to lock inputs
+    // Variable to lock inputs
+    private bool isInputLocked = false;
+    // Assign in the inspector
+    [SerializeField] private Camera miniCamera;
+    // Create and assign in Unity Editor
+    [SerializeField] private RenderTexture miniCameraRenderTexture; 
 
     void Start()
     {
         mainCamera = Camera.main;
+        SetupMiniCamera();
     }
 
     void Update()
     {
+        UpdateMiniCameraView();
         // Check if inputs are locked or UI is active
         if (isInputLocked || EventSystem.current.currentSelectedGameObject != null)
         {
@@ -39,6 +46,29 @@ public class SceneController : MonoBehaviour
         HandleObjectSelection();
         HandleObjectManipulation();
         HandleCameraControls();
+    }
+
+    private void SetupMiniCamera()
+    {
+        if (miniCamera != null)
+        {
+            // Set the RenderTexture to mini camera
+            miniCamera.targetTexture = miniCameraRenderTexture;
+        }
+        else
+        {
+            Debug.LogError("Mini camera is not assigned!");
+        }
+    }
+
+    private void UpdateMiniCameraView()
+    {
+        if (miniCamera != null && mainCamera != null)
+        {
+            // Optional: Match the mini camera's position and rotation with the main camera
+            miniCamera.transform.position = mainCamera.transform.position;
+            miniCamera.transform.rotation = mainCamera.transform.rotation;
+        }
     }
 
     public void LockInput(bool lockInput)
@@ -100,13 +130,18 @@ public class SceneController : MonoBehaviour
                 }
 
                 selectedObject = hit.collider.gameObject;
+                SelectObject(selectedObject);
+
+                // Ensure the selected object is the root by climbing up the parent chain
+                while (selectedObject.transform.parent != null)
+                {
+                    selectedObject = selectedObject.transform.parent.gameObject;
+                }
 
                 if (selectedObject != lastSelectedObject)
                 {
                     lastSelectedObject = selectedObject;
                 }
-
-                SelectObject(selectedObject);
             }
         }
     }
@@ -136,6 +171,7 @@ public class SceneController : MonoBehaviour
         float rotationSpeed = 100.0f;
         float scaleSpeed = 0.01f;
         float moveSpeed = 0.1f;
+        bool transformationOccurred = false;
 
         // ----- Rotation -----
         float mouseX = Input.GetAxis("Mouse X");
@@ -145,16 +181,19 @@ public class SceneController : MonoBehaviour
         {
             // Rotate around Y-axis
             selectedObject.transform.Rotate(Vector3.up, -mouseX * rotationSpeed * Time.deltaTime, Space.World);
+            transformationOccurred = true;
         }
         if (Input.GetKey(KeyCode.X))
         {
             // Rotate around X-axis
             selectedObject.transform.Rotate(Vector3.right, mouseY * rotationSpeed * Time.deltaTime, Space.World);
+            transformationOccurred = true;
         }
         if (Input.GetKey(KeyCode.C))
         {
             // Rotate around Z-axis
             selectedObject.transform.Rotate(Vector3.forward, mouseX * rotationSpeed * Time.deltaTime, Space.World);
+            transformationOccurred = true;
         }
 
         // ----- Flipping -----
@@ -166,6 +205,7 @@ public class SceneController : MonoBehaviour
                 selectedObject.transform.localScale.y,
                 selectedObject.transform.localScale.z
             );
+            transformationOccurred = true;
         }
         if (Input.GetKeyDown(KeyCode.F2))
         {
@@ -175,6 +215,7 @@ public class SceneController : MonoBehaviour
                 -selectedObject.transform.localScale.y,
                 selectedObject.transform.localScale.z
             );
+            transformationOccurred = true;
         }
         if (Input.GetKeyDown(KeyCode.F3))
         {
@@ -184,6 +225,7 @@ public class SceneController : MonoBehaviour
                 selectedObject.transform.localScale.y,
                 -selectedObject.transform.localScale.z
             );
+            transformationOccurred = true;
         }
 
 
@@ -194,10 +236,12 @@ public class SceneController : MonoBehaviour
             if (Input.GetKey(KeyCode.UpArrow))
             {
                 selectedObject.transform.localScale += new Vector3(scaleSpeed, scaleSpeed, scaleSpeed);
+                transformationOccurred = true;
             }
             else if (Input.GetKey(KeyCode.DownArrow))
             {
                 selectedObject.transform.localScale -= new Vector3(scaleSpeed, scaleSpeed, scaleSpeed);
+                transformationOccurred = true;
             }
         }
         else
@@ -207,30 +251,36 @@ public class SceneController : MonoBehaviour
             if (Input.GetKey(KeyCode.LeftControl) && Input.GetKey(KeyCode.UpArrow))
             {
                 selectedObject.transform.localScale += new Vector3(scaleSpeed, 0, 0);
+                transformationOccurred = true;
             }
             else if (Input.GetKey(KeyCode.LeftControl) && Input.GetKey(KeyCode.DownArrow))
             {
                 selectedObject.transform.localScale -= new Vector3(scaleSpeed, 0, 0);
+                transformationOccurred = true;
             }
 
             // Scale Y-axis
             if (Input.GetKey(KeyCode.RightControl) && Input.GetKey(KeyCode.UpArrow))
             {
                 selectedObject.transform.localScale += new Vector3(0, scaleSpeed, 0);
+                transformationOccurred = true;
             }
             else if (Input.GetKey(KeyCode.RightControl) && Input.GetKey(KeyCode.DownArrow))
             {
                 selectedObject.transform.localScale -= new Vector3(0, scaleSpeed, 0);
+                transformationOccurred = true;
             }
 
             // Scale Z-axis
             if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKey(KeyCode.RightArrow))
             {
                 selectedObject.transform.localScale += new Vector3(0, 0, scaleSpeed);
+                transformationOccurred = true;
             }
             else if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKey(KeyCode.LeftArrow))
             {
                 selectedObject.transform.localScale -= new Vector3(0, 0, scaleSpeed);
+                transformationOccurred = true;
             }
         }
         // Prevent negative or too small scaling
@@ -267,6 +317,7 @@ public class SceneController : MonoBehaviour
                 selectedObject.transform.Translate(Vector3.down * moveSpeed, Space.World);
             }
 
+            transformationOccurred = true;
             selectedObject.transform.Translate(new Vector3(horizontal, upDown, vertical), Space.World);
         }
 
@@ -276,6 +327,31 @@ public class SceneController : MonoBehaviour
             spawnedObjects.Remove(selectedObject); // Remove from list
             Destroy(selectedObject); // Remove from scene
             selectedObject = null; // Reset selected object
+            transformationOccurred = true;
+        }
+
+        // After transformations, directly update the corresponding object in the spawnedObjects list
+        if (transformationOccurred)
+        {
+            UpdateObjectTransform(selectedObject);
+        }
+    }
+
+    private void UpdateObjectTransform(GameObject obj)
+    {
+        // Assuming each object has a unique name or identifier for comparison
+        GameObject foundObj = spawnedObjects.FirstOrDefault(o => o.name == obj.name);
+        if (foundObj != null)
+        {
+            // Update the transformation directly in the spawnedObjects list
+            foundObj.transform.position = obj.transform.position;
+            foundObj.transform.rotation = obj.transform.rotation;
+            foundObj.transform.localScale = obj.transform.localScale;
+            Debug.Log($"obj.transform.position: {obj.transform.position},\n obj.transform.rotation {obj.transform.rotation},\n {obj.transform.localScale}");
+        }
+        else
+        {
+            Debug.LogError("Object not found in spawnedObjects list.");
         }
     }
 
@@ -368,7 +444,6 @@ public class SceneController : MonoBehaviour
 
                 importedModel.tag = "ImportedObject";
                 spawnedObjects.Add(importedModel);
-
                 // Send scale and rotation information back to Flutter
                 string logMessage = $"Model Scale: {importedModel.transform.localScale}, Rotation: {importedModel.transform.rotation.eulerAngles}";
                 UnityMessageManager.Instance.SendMessageToFlutter(logMessage); 
@@ -383,21 +458,6 @@ public class SceneController : MonoBehaviour
 
     private void AddCollidersRecursively(GameObject obj)
     {
-        // if (obj.GetComponent<MeshRenderer>() != null)
-        // {
-        //     if (obj.GetComponent<Collider>() == null)
-        //     {
-        //         obj.AddComponent<BoxCollider>();
-        //     }
-        // }
-        // else
-        // {
-        //     foreach (Transform child in obj.transform)
-        //     {
-        //         AddCollidersRecursively(child.gameObject);
-        //     }
-        // }
-
         // Add a MeshCollider if the object has a MeshRenderer and no collider
         if (obj.GetComponent<MeshRenderer>() != null && obj.GetComponent<Collider>() == null)
         {
@@ -494,9 +554,6 @@ public class SceneController : MonoBehaviour
     {
         try
         {
-            // Sync object transformations before exporting
-            SyncObjectTransforms();
-
             // Prepare the scene data
             SceneData sceneData = new SceneData();
             foreach (GameObject obj in spawnedObjects)
@@ -511,9 +568,9 @@ public class SceneController : MonoBehaviour
                         rotation = obj.transform.rotation,
                         scale = obj.transform.localScale,
                         type = "NavigationLine",
-                        label = navPoint?.Label,
-                        isSource = navPoint?.IsSource ?? false,
-                        isDestination = navPoint?.IsDestination ?? false
+                        label = obj.GetComponentInChildren<TextMeshPro>()?.text ?? "",
+                        isSource = obj.GetComponent<NavigationPoint>()?.IsSource ?? false,
+                        isDestination = obj.GetComponent<NavigationPoint>()?.IsDestination ?? false
                     };
                     sceneData.objects.Add(navData);
                 }
@@ -530,7 +587,6 @@ public class SceneController : MonoBehaviour
                         isDestination = false
                     };
                     Debug.Log("Exported Scene Data: " + objData);
-                    Debug.Log($"Object data: {obj.transform.position} \n\n {obj.transform.rotation} \n\n {obj.transform.localScale} \n\n {obj.transform}");
                     sceneData.objects.Add(objData);
                 }
             }
@@ -619,24 +675,6 @@ public class SceneController : MonoBehaviour
         }
     }
 
-    private void SyncObjectTransforms()
-    {
-        foreach (GameObject obj in spawnedObjects)
-        {
-            // Ensure the scene object is the same one being manipulated
-            if (obj != null)
-            {
-                obj.transform.position = GameObject.Find(obj.name).transform.position;
-                obj.transform.rotation = GameObject.Find(obj.name).transform.rotation;
-                obj.transform.localScale = GameObject.Find(obj.name).transform.localScale;
-            }
-            Debug.Log($"Current Transform - Pos: {obj.transform.position}, Rot: {obj.transform.rotation}, Scale: {obj.transform.localScale}");
-            Debug.LogError($"SceneObj: {sceneObj}\n{GameObject.Find(obj.name)}\n{obj.name}\n{sceneObj.transform.position}\n{sceneObj.transform.rotation}\n{sceneObj.transform.localScale}");
-        }
-        
-        Debug.LogError($"Reached here");
-    }
-
     public void ImportScene(string zipFilePath)
     {
         try
@@ -671,7 +709,8 @@ public class SceneController : MonoBehaviour
                 {
                     GameObject navPoint = Instantiate(navigationPointPrefab, objData.position, objData.rotation);
                     navPoint.transform.localScale = objData.scale;
-                    Debug.Log($"navPoint: {navPoint}");
+                    var textMesh = navPoint.GetComponentInChildren<TextMeshPro>();
+                    textMesh.text = objData.label;
                 }
                 else
                 {
@@ -689,16 +728,15 @@ public class SceneController : MonoBehaviour
                             if (meshObject != null)
                             {
                                 // Apply transformations to the correct object
-                                meshObject.transform.position = objData.position;
-                                meshObject.transform.rotation = objData.rotation;
-                                meshObject.transform.localScale = objData.scale;
+                                importedModel.transform.position = objData.position;
+                                importedModel.transform.rotation = objData.rotation;
+                                importedModel.transform.localScale = objData.scale;
                                 importedModel.tag = "ImportedObject";
+                                importedModel.name = objData.type;
 
                                 // Ensure the object has a collider
                                 AddCollidersRecursively(meshObject);
-
-                                // Log details about the found object
-                                Debug.Log($"Mesh object found: {meshObject.name}, Position: {meshObject.transform.position}, Scale: {meshObject.transform.localScale}");
+                                spawnedObjects.Add(importedModel);
                             }
                             else
                             {
@@ -790,47 +828,6 @@ public class SceneController : MonoBehaviour
         public bool isDestination;
     }
 }
-
-// public static class OBJExporter
-// {
-//     public static void Export(GameObject obj, StreamWriter writer)
-//     {
-//         MeshFilter meshFilter = obj.GetComponent<MeshFilter>();
-//         if (meshFilter == null || meshFilter.sharedMesh == null)
-//         {
-//             Debug.LogError($"Failed to export {obj.name}: Missing MeshFilter or sharedMesh.");
-//             return;
-//         }
-        
-//         if (meshFilter != null)
-//         {
-//             Mesh mesh = meshFilter.sharedMesh;
-//             foreach (Vector3 v in mesh.vertices)
-//             {
-//                 writer.WriteLine($"v {v.x} {v.y} {v.z}");
-//             }
-
-//             foreach (Vector3 n in mesh.normals)
-//             {
-//                 writer.WriteLine($"vn {n.x} {n.y} {n.z}");
-//             }
-
-//             foreach (Vector2 uv in mesh.uv)
-//             {
-//                 writer.WriteLine($"vt {uv.x} {uv.y}");
-//             }
-
-//             for (int submesh = 0; submesh < mesh.subMeshCount; submesh++)
-//             {
-//                 int[] triangles = mesh.GetTriangles(submesh);
-//                 for (int i = 0; i < triangles.Length; i += 3)
-//                 {
-//                     writer.WriteLine($"f {triangles[i] + 1} {triangles[i + 1] + 1} {triangles[i + 2] + 1}");
-//                 }
-//             }
-//         }
-//     }
-// }
 
 public static class OBJExporter
 {
